@@ -1,1 +1,5 @@
 tk
+librosa
+matplotlib==3.5.3
+setuptools
+pyaudio
