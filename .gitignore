@@ -1,3 +1,4 @@
 venv/*
 waveform.png
 __pycache__/audio_viewer.cpython-312.pyc
+spectrogram.png
