@@ -1,5 +1,5 @@
 import os
-import shutil
+import shutil, time
 from audio_viewer import AudioViewer
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -7,23 +7,6 @@ import threading
 import pygame # type: ignore
 
 pygame.mixer.init()
-
-def play_audio():
-    global sound, audio_playing
-    
-    if audio_playing:
-        sound.stop()
-        audio_playing = False
-        play_button.config(text="Play")  # Change button text to "Play"
-    else:
-        if last_selected_file:
-            sound = pygame.mixer.Sound(last_selected_file)
-            sound.play()
-            audio_playing = True
-            play_button.config(text="Stop")  # Change button text to "Stop"
-        else:
-            messagebox.showerror("Error", "No audio file selected.")
-
 
 def select_source_directory():  # Select the source directory for scanning
     directory = filedialog.askdirectory()  # Get the selected directory
@@ -134,6 +117,37 @@ def show_visuals(file, checkbutton): # Create visuals for audio file
             checkbutton.state(['!alternate'])
         AudioViewer.generate_visuals_async(file, display_waveform_and_spectrogram)
         play_button.pack(side=tk.LEFT)
+
+def play_audio():
+    global sound, audio_playing
+    
+    if audio_playing:
+        sound.stop()
+        audio_playing = False
+        play_button.config(text="Play")  # Change button text to "Play"
+    else:
+        if last_selected_file:
+            sound = pygame.mixer.Sound(last_selected_file)
+            sound.play()  # Start playback asynchronously
+            
+            # Update audio_playing flag and button text asynchronously
+            audio_playing = True
+            play_button.config(text="Stop")  # Change button text to "Stop"
+            
+            # Schedule checking for playback completion
+            root.after(100, check_playback_completion)
+        else:
+            messagebox.showerror("Error", "No audio file selected.")
+
+def check_playback_completion():
+    global sound, audio_playing
+    
+    if not pygame.mixer.get_busy():  # If no channel is actively playing
+        audio_playing = False
+        play_button.config(text="Play")  # Change button text to "Play"
+    else:
+        # Schedule the next check after 100 milliseconds
+        root.after(100, check_playback_completion)
 
 audio_files_list, filtered_files, checkvars = [], [], []  # Initialize a list for audio files, filtered files and check variables
 # Initialize global variables
