@@ -1,7 +1,6 @@
 import os
 import librosa.display
 import matplotlib.pyplot as plt
-import tkinter as tk
 import numpy as np
 
 class AudioViewer:
@@ -18,7 +17,7 @@ class AudioViewer:
         waveform_ax.set_ylabel('Amplitude')
         librosa.display.waveshow(y, sr=sr, ax=waveform_ax)
         waveform_ax.margins(0, 0.1)  # Adjust padding to ensure waveform starts from y-axis
-        plt.subplots_adjust(left=0.09, right=0.98, top=0.9)
+        plt.subplots_adjust(left=0.09, right=0.98, top=0.92)
 
         # Generate spectrogram
         spectrogram_figure = plt.figure(figsize=(9, 3.9))  # Adjusted figure size
@@ -29,7 +28,7 @@ class AudioViewer:
         S = librosa.feature.melspectrogram(y=y, sr=sr)
         S_dB = librosa.power_to_db(S, ref=np.max)
         librosa.display.specshow(S_dB, sr=sr, x_axis='time', y_axis='mel', ax=spectrogram_ax)
-        plt.subplots_adjust(left=0.09, right=0.98, top=0.9)
+        plt.subplots_adjust(left=0.09, right=0.98, top=0.92)
 
 
         # Save waveform and spectrogram images to temporary files
