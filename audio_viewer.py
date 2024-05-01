@@ -1,11 +1,14 @@
-import os
-import librosa.display
-import matplotlib.pyplot as plt
 import numpy as np
+import os
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+import librosa
+import librosa.display
 
 class AudioViewer:
     @staticmethod
-    def generate_visuals_async(audio_file, visuals_callback):
+    def generate_visuals_async(audio_file, waveform_frame, spectrogram_frame, checkbutton):
         # Load audio file
         y, sr = librosa.load(audio_file, sr=None)
 
@@ -27,16 +30,22 @@ class AudioViewer:
         spectrogram_ax.set_ylabel('Frequency (Hz)')
         S = librosa.feature.melspectrogram(y=y, sr=sr)
         S_dB = librosa.power_to_db(S, ref=np.max)
+
         librosa.display.specshow(S_dB, sr=sr, x_axis='time', y_axis='mel', ax=spectrogram_ax)
         plt.subplots_adjust(left=0.09, right=0.98, top=0.92)
 
+        # Embed waveform and spectrogram into Tkinter frames
+        waveform_canvas = FigureCanvasTkAgg(waveform_figure, master=waveform_frame)
+        waveform_canvas.draw()
+        waveform_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-        # Save waveform and spectrogram images to temporary files
-        waveform_file = "waveform.png"
-        spectrogram_file = "spectrogram.png"
-        waveform_figure.savefig(waveform_file)
-        spectrogram_figure.savefig(spectrogram_file)
+        spectrogram_canvas = FigureCanvasTkAgg(spectrogram_figure, master=spectrogram_frame)
+        spectrogram_canvas.draw()
+        spectrogram_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
-        # Call the callback functions with the waveform and spectrogram image files
-        visuals_callback(waveform_file, spectrogram_file)
+        # Call the callback function
+        checkbutton.state(['!alternate'])
 
+        # Destroy Matplotlib figures
+        plt.close(waveform_figure)
+        plt.close(spectrogram_figure)

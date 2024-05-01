@@ -13,7 +13,6 @@ def select_source_directory():  # Select the source directory for scanning
     if directory:  # Check if a directory was selected
         source_entry.set(directory)  # Set the entry field with the selected directory
         threading.Thread(target=scan_and_update, args=(directory,)).start()  # Start scanning in a new thread
-
 def scan_directory(directory):  # Scan the directory for audio files
     audio_files = []  # Initialize list of audio files
     for root, _, files in os.walk(directory):  # Walk through the directory tree
@@ -21,29 +20,29 @@ def scan_directory(directory):  # Scan the directory for audio files
             if file.endswith(('.mp3', '.wav')):  # Check if the file is an audio file
                 audio_files.append(os.path.join(root, file))  # Add the file to the list
     return audio_files
-
 def scan_and_update(directory):  # Scan the directory for audio files and update the checkbuttons
     global audio_files_list  # Use a global variable for the list of audio files
     audio_files_list = scan_directory(directory)  # Get the list of audio files
     update_checkbuttons()  # Update the checkbuttons
-
 def select_target_directory():  # Select the target directory for transferring files
     directory = filedialog.askdirectory()  # Get the selected directory
     if directory:  # Check if a directory was selected
         target_entry.set(directory)  # Set the entry field with the selected directory
-
 def on_filter_text_changed(event):  # Handle filter text changes
     update_checkbuttons()  # Update the checkbuttons
-
 def on_entry_click(event):
     if filter_entry.get() == 'Type here to filter files':
         filter_entry.delete(0, tk.END)
         filter_entry.config(fg='white')  # Change text color to black when user starts typing
-
 def on_entry_leave(event):
     if not filter_entry.get():
         filter_entry.insert(0, 'Type here to filter files')
         filter_entry.config(fg='white')  # Change text color back to grey when entry is empty
+def on_mousewheel(event):  # Handle mouse wheel events
+    if event.delta < 0:
+        canvas.yview_scroll(1, "units")  # Scroll up
+    elif event.delta > 0:
+        canvas.yview_scroll(-1, "units")  # Scroll down
 
 def update_checkbuttons():  # Update the checkbuttons with the filtered list of audio files
     for widget in checkbutton_frame.winfo_children():  # Destroy all existing widgets
@@ -72,49 +71,47 @@ def update_checkbuttons():  # Update the checkbuttons with the filtered list of 
     else:
         files_frame.pack_forget()  # Forget the frame
 
-def show_visuals(file, checkbutton): # Create visuals for audio file
-    print(file)
+def show_visuals(file, checkbutton):
+    
     global last_selected_file
+    if file == last_selected_file: last_selected_file; play_audio(); return
     last_selected_file = file
-    play_audio()
-    # Clear the waveform and spectrogram frames
-    for widget in waveform_frame.winfo_children():
-        widget.destroy()
-    for widget in spectrogram_frame.winfo_children():
-        widget.destroy()
+    
+    original_width, original_height = root.winfo_width(), root.winfo_height() # Store the original window size
+    [widget.destroy() for widget in waveform_frame.winfo_children() + spectrogram_frame.winfo_children()] # Clear plot frames
 
     if file:
-        loading_label = tk.Label(visuals_frame, text="Generating waveform, please wait...")
-        loading_label.pack(padx=10, pady=10)
+        loading_label = tk.Label(waveform_frame, text="Generating plots, please wait...")
+        loading_label.pack(side=tk.TOP, padx=10, pady=10)
 
-        def display_waveform_and_spectrogram(waveform_image, spectrogram_image):
+        def display_waveform_and_spectrogram():
             loading_label.destroy()
+            AudioViewer.generate_visuals_async(file, waveform_frame, spectrogram_frame, checkbutton)
 
-            # Display waveform
-            waveform_photo = tk.PhotoImage(file=waveform_image)
-            waveform_label = tk.Label(waveform_frame, image=waveform_photo)
-            waveform_label.image = waveform_photo
-            waveform_label.pack(side=tk.TOP, padx=2, pady=1)
+            # Prevent the window from shrinking below the original size
+            root.update_idletasks()
+            current_width = root.winfo_width()
+            current_height = root.winfo_height()
+            root.minsize(max(current_width, original_width), max(current_height, original_height))
 
-            # Display spectrogram
-            spectrogram_photo = tk.PhotoImage(file=spectrogram_image)
-            spectrogram_label = tk.Label(spectrogram_frame, image=spectrogram_photo)
-            spectrogram_label.image = spectrogram_photo
-            spectrogram_label.pack(side=tk.BOTTOM, padx=2, pady=1)
-
-            checkbutton.state(['!alternate'])
-        AudioViewer.generate_visuals_async(file, display_waveform_and_spectrogram)
-        play_button.pack(side=tk.LEFT)
+            play_button.pack(side=tk.BOTTOM)# Pack the play button at the bottom of the player frame
+            play_audio()  # Start audio playback after visuals are generated
+        
+        visuals_frame.after(0, display_waveform_and_spectrogram) # Call the function asynchronously
+        play_button.pack_forget() # Hide the play button during plot generation
 
 def play_audio():
-    global sound, audio_playing
+    global sound, audio_playing, last_played_file
     
-    if audio_playing:
-        sound.stop()
-        audio_playing = False
-        play_button.config(text="Play")  # Change button text to "Play"
-    else:
-        if last_selected_file:
+    if last_selected_file:
+        if audio_playing and last_played_file == last_selected_file:
+            sound.stop()
+            audio_playing = False
+            play_button.config(text="Play")  # Change button text to "Play"
+        else:
+            if audio_playing and last_played_file != last_selected_file:
+                sound.stop()
+                
             sound = pygame.mixer.Sound(last_selected_file)
             sound.play()  # Start playback asynchronously
             
@@ -122,10 +119,16 @@ def play_audio():
             audio_playing = True
             play_button.config(text="Stop")  # Change button text to "Stop"
             
+    
+            # Update the last played file
+            last_played_file = last_selected_file
+            
             # Schedule checking for playback completion
             root.after(100, check_playback_completion)
-        else:
-            messagebox.showerror("Error", "No audio file selected.")
+    else:
+        messagebox.showerror("Error", "No audio file selected.")
+
+
 
 def check_playback_completion():
     global sound, audio_playing
@@ -134,15 +137,7 @@ def check_playback_completion():
         audio_playing = False
         play_button.config(text="Play")  # Change button text to "Play"
     else:
-        # Schedule the next check after 100 milliseconds
-        root.after(100, check_playback_completion)
-
-def on_mousewheel(event):  # Handle mouse wheel events
-    if event.delta < 0:
-        canvas.yview_scroll(1, "units")  # Scroll up
-    elif event.delta > 0:
-        canvas.yview_scroll(-1, "units")  # Scroll down
-
+        root.after(100, check_playback_completion) # Schedule the next check after 100 milliseconds
 def transfer_files():  # Transfer selected files to the target directory
     selected_files = [file for file, var in file_vars.items() if var.get()]  # Get the list of selected files
 
@@ -162,7 +157,7 @@ def transfer_files():  # Transfer selected files to the target directory
 
 audio_files_list, filtered_files, checkvars = [], [], []  # Initialize a list for audio files, filtered files and check variables
 # Initialize global variables
-last_selected_file, sound = None, None
+last_played_file, last_selected_file, sound = None, None, None
 audio_playing = False
 
 root = tk.Tk()  # Create the main window
@@ -220,15 +215,15 @@ files_frame.pack(side=tk.LEFT, padx=(6,2), fill=tk.BOTH, expand=True)  # Pack th
 
 visuals_frame = tk.Frame(browser_frame)
 
+player_frame = tk.Frame(visuals_frame)
+play_button = tk.Button(player_frame, text="Play", command=play_audio)
+player_frame.pack(side=tk.BOTTOM) 
+
 waveform_frame = tk.Frame(visuals_frame)  # Create a frame for the waveform
 waveform_frame.pack(side=tk.TOP, pady=2)  # Pack the frame
 
 spectrogram_frame = tk.Frame(visuals_frame)  # Create a frame for the waveform
 spectrogram_frame.pack(pady=2)  # Pack the frame
-
-player_frame = tk.Frame(visuals_frame)
-play_button = tk.Button(player_frame, text="Play", command=play_audio)
-player_frame.pack(side=tk.BOTTOM) 
 
 visuals_frame.pack(side=tk.RIGHT, padx=(2,6), fill=tk.BOTH, expand=True) 
 
