@@ -31,32 +31,19 @@ def select_target_directory():  # Select the target directory for transferring f
     directory = filedialog.askdirectory()  # Get the selected directory
     if directory:  # Check if a directory was selected
         target_entry.set(directory)  # Set the entry field with the selected directory
-             
-def transfer_files():  # Transfer selected files to the target directory
-    selected_files = [file for file, var in file_vars.items() if var.get()]  # Get the list of selected files
-
-    if not selected_files:  # Check if any files were selected
-        messagebox.showerror("Error", "No files selected for transfer.")  # Show an error message
-        return
-
-    target_dir = target_entry.get()  # Get the target directory
-    if not target_dir:  # Check if a target directory was selected
-        messagebox.showerror("Error", "No target directory selected.")  # Show an error message
-        return
-
-    for file in selected_files:  # Transfer each selected file
-        shutil.copy(file, target_dir)  # Copy the file to the target directory
-
-    messagebox.showinfo("Success", "Files transferred successfully.")  # Show a success message
-
-def on_mousewheel(event):  # Handle mouse wheel events
-    if event.delta < 0:
-        canvas.yview_scroll(1, "units")  # Scroll up
-    elif event.delta > 0:
-        canvas.yview_scroll(-1, "units")  # Scroll down
 
 def on_filter_text_changed(event):  # Handle filter text changes
     update_checkbuttons()  # Update the checkbuttons
+
+def on_entry_click(event):
+    if filter_entry.get() == 'Type here to filter files':
+        filter_entry.delete(0, tk.END)
+        filter_entry.config(fg='white')  # Change text color to black when user starts typing
+
+def on_entry_leave(event):
+    if not filter_entry.get():
+        filter_entry.insert(0, 'Type here to filter files')
+        filter_entry.config(fg='white')  # Change text color back to grey when entry is empty
 
 def update_checkbuttons():  # Update the checkbuttons with the filtered list of audio files
     for widget in checkbutton_frame.winfo_children():  # Destroy all existing widgets
@@ -66,7 +53,8 @@ def update_checkbuttons():  # Update the checkbuttons with the filtered list of 
     file_vars = {}  # Initialize the dictionary
 
     global filtered_files  # Use a global variable for the list of filtered files
-    filter_text = filter_entry.get().lower()  # Get the text from the filter entry field
+    
+    filter_text = filter_entry.get().lower() if filter_entry.get().lower() != 'type here to filter files' else ''
     filtered_files = [file for file in audio_files_list if filter_text in os.path.basename(file).lower()]  # Filter the list of audio files
 
     for file in filtered_files:  # Create a checkbutton for each filtered file
@@ -149,6 +137,29 @@ def check_playback_completion():
         # Schedule the next check after 100 milliseconds
         root.after(100, check_playback_completion)
 
+def on_mousewheel(event):  # Handle mouse wheel events
+    if event.delta < 0:
+        canvas.yview_scroll(1, "units")  # Scroll up
+    elif event.delta > 0:
+        canvas.yview_scroll(-1, "units")  # Scroll down
+
+def transfer_files():  # Transfer selected files to the target directory
+    selected_files = [file for file, var in file_vars.items() if var.get()]  # Get the list of selected files
+
+    if not selected_files:  # Check if any files were selected
+        messagebox.showerror("Error", "No files selected for transfer.")  # Show an error message
+        return
+
+    target_dir = target_entry.get()  # Get the target directory
+    if not target_dir:  # Check if a target directory was selected
+        messagebox.showerror("Error", "No target directory selected.")  # Show an error message
+        return
+
+    for file in selected_files:  # Transfer each selected file
+        shutil.copy(file, target_dir)  # Copy the file to the target directory
+
+    messagebox.showinfo("Success", "Files transferred successfully.")  # Show a success message
+
 audio_files_list, filtered_files, checkvars = [], [], []  # Initialize a list for audio files, filtered files and check variables
 # Initialize global variables
 last_selected_file, sound = None, None
@@ -160,35 +171,33 @@ root.title("Audio Browser")  # Set the title of the window
 directory_frame = tk.Frame(root)
 
 source_frame = tk.Frame(directory_frame)  # Create a frame for the source directory
-
 select_source_button = tk.Button(source_frame, text="Select Source Directory", command=select_source_directory)  # Create a button to select the source directory
-select_source_button.pack(side=tk.LEFT, padx=(0, 6))  # Pack the button
+select_source_button.pack(side=tk.LEFT, padx=(0, 6))
 source_label = tk.Label(source_frame, text="Source Directory:")  # Create a label for the source directory
-source_label.pack(side=tk.LEFT)  # Pack the label
+source_label.pack(side=tk.LEFT)
 source_entry = tk.StringVar()  # Initialize an entry field for the source directory
 source_entry.set("")  # Set the default value of the entry field
 source_entry_label = tk.Label(source_frame, textvariable=source_entry, anchor='w', width=40)  # Create a label for the entry field
-source_entry_label.pack(side=tk.LEFT, fill=tk.X, expand=True)  # Pack the label
-
-source_frame.pack(fill=tk.X, padx=10, pady=(6, 2))  # Pack the frame
+source_entry_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+source_frame.pack(fill=tk.X, padx=10, pady=(6, 2))
 
 target_frame = tk.Frame(directory_frame)  # Create a frame for the target directory
-
 select_target_button = tk.Button(target_frame, text="Select Target Directory", command=select_target_directory)  # Create a button to select the target directory
-select_target_button.pack(side=tk.LEFT, padx=(0, 6))  # Pack the button
+select_target_button.pack(side=tk.LEFT, padx=(0, 6))
 target_label = tk.Label(target_frame, text="Target Directory:")  # Create a label for the target directory
-target_label.pack(side=tk.LEFT)  # Pack the label
+target_label.pack(side=tk.LEFT) 
 target_entry = tk.StringVar()  # Initialize an entry field for the target directory
 target_entry.set("")  # Set the default value of the entry field
 target_entry_label = tk.Label(target_frame, textvariable=target_entry, anchor='w', width=36)  # Create a label for the entry field
-target_entry_label.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(2, 2))  # Pack the label
+target_entry_label.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(2, 2)) 
+target_frame.pack(fill=tk.X, padx=10, pady=(2, 6))
 
-target_frame.pack(fill=tk.X, padx=10, pady=(2, 6))  # Pack the frame
-
-filter_entry = tk.Entry(directory_frame, highlightthickness=1, bd=1)  # Create an entry field for filtering files
+filter_entry = tk.Entry(directory_frame, highlightthickness=1, bd=1, fg='white', bg='black')  # Create an entry field for filtering files
+filter_entry.insert(0, 'Type here to filter files')  # Insert faded text as placeholder
 filter_entry.bind("<KeyRelease>", on_filter_text_changed)  # Bind a function to the key release event
-
-filter_entry.pack(fill=tk.X, padx=16, pady=(3, 3))  # Pack the entry field
+filter_entry.bind('<FocusIn>', on_entry_click)  # Bind click event
+filter_entry.bind('<FocusOut>', on_entry_leave)  # Bind leave event
+filter_entry.pack(fill=tk.X, padx=16, pady=(3, 3))
 
 directory_frame.pack(fill=tk.X, padx=6, pady=6)
 
