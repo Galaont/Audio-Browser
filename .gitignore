@@ -3,3 +3,4 @@ waveform.png
 __pycache__/audio_viewer.cpython-312.pyc
 spectrogram.png
 __pycache__/audio_player.cpython-312.pyc
+directory_cache.pkl

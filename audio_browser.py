@@ -1,5 +1,5 @@
 import os
-import shutil, time
+import shutil, pickle
 from audio_viewer import AudioViewer
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -9,13 +9,24 @@ import pygame # type: ignore
 pygame.mixer.init()
 
 def select_directory(type=None):
-    directory = filedialog.askdirectory()
+    global directory_cache
+    try:
+        with open('directory_cache.pkl', 'rb') as f:
+            directory_cache = pickle.load(f)
+    except FileNotFoundError:
+        pass
+
+    directory = filedialog.askdirectory() or directory_cache.get(type, '')
     if directory:
+        directory_cache[type] = directory
         if type == 'source':
             source_entry.set(directory)
             threading.Thread(target=scan_and_update, args=(directory,)).start()
         elif type == 'target':
             target_entry.set(directory)
+
+    with open('directory_cache.pkl', 'wb') as f:
+        pickle.dump(directory_cache, f)
 
 def scan_and_update(directory):  # Scan the directory for audio files and update the checkbuttons
     global audio_files_list  # Use a global variable for the list of audio files
@@ -59,15 +70,13 @@ def update_checkbuttons(files):  # Update the checkbuttons with the filtered lis
     else:
         files_frame.pack_forget()  # Forget the frame
         
-def on_entry_click(event):
+def toggle_searchbar_focus(event):
+    global filter_entry
     if filter_entry.get() == 'Type here to filter files':
         filter_entry.delete(0, tk.END)
-        filter_entry.config(fg='white')  # Change text color to black when user starts typing
-
-def on_entry_leave(event):
-    if not filter_entry.get():
-        filter_entry.insert(0, 'Type here to filter files')
-        filter_entry.config(fg='white')  # Change text color back to grey when entry is empty
+    else:
+        if not filter_entry.get():
+            filter_entry.insert(0, 'Type here to filter files')
 
 def on_mousewheel(event):  # Handle mouse wheel events
     if event.delta < 0:
@@ -122,7 +131,7 @@ def play_audio():
             audio_playing = True # Update audio_playing flag
             play_button.config(text="Stop")  # Change button text to "Stop"
             last_played_file = last_selected_file # Update the last played file
-            root.after(100, check_playback_completion) # Schedule checking for playback completion
+            root.after(20, check_playback_completion) # Schedule checking for playback completion
     else:
         messagebox.showerror("Error", "No audio file selected.")
 
@@ -133,7 +142,7 @@ def check_playback_completion():
         audio_playing = False
         play_button.config(text="Play")  # Change button text to "Play"
     else:
-        root.after(100, check_playback_completion) # Schedule the next check after 100 milliseconds
+        root.after(20, check_playback_completion) # Schedule the next check after 100 milliseconds
 
 def transfer_files():  # Transfer selected files to the target directory
     selected_files = [file for file, var in file_vars.items() if var.get()]  # Get the list of selected files
@@ -153,7 +162,7 @@ def transfer_files():  # Transfer selected files to the target directory
     messagebox.showinfo("Success", "Files transferred successfully.")  # Show a success message
 
 audio_files_list, filtered_files, checkvars = [], [], []  # Initialize a list for audio files, filtered files and check variables
-# Initialize global variables
+directory_cache = {'source': '', 'target': ''}
 last_played_file, last_selected_file, sound = None, None, None
 audio_playing = False
 
@@ -187,8 +196,9 @@ target_frame.pack(fill=tk.X, padx=10, pady=(2, 6))
 filter_entry = tk.Entry(directory_frame, highlightthickness=1, bd=1, fg='white', bg='black')  # Create an entry field for filtering files
 filter_entry.insert(0, 'Type here to filter files')  # Insert faded text as placeholder
 filter_entry.bind("<KeyRelease>", on_filter_text_changed)  # Bind a function to the key release event
-filter_entry.bind('<FocusIn>', on_entry_click)  # Bind click event
-filter_entry.bind('<FocusOut>', on_entry_leave)  # Bind leave event
+filter_entry.bind('<FocusIn>', toggle_searchbar_focus)  # Bind click event
+filter_entry.bind('<FocusOut>', toggle_searchbar_focus)  # Bind leave event
+filter_entry.config(fg='white')  
 filter_entry.pack(fill=tk.X, padx=16, pady=(3, 3))
 
 directory_frame.pack(fill=tk.X, padx=6, pady=6)
