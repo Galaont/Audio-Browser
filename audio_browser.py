@@ -8,11 +8,20 @@ import pygame # type: ignore
 
 pygame.mixer.init()
 
-def select_source_directory():  # Select the source directory for scanning
-    directory = filedialog.askdirectory()  # Get the selected directory
-    if directory:  # Check if a directory was selected
-        source_entry.set(directory)  # Set the entry field with the selected directory
-        threading.Thread(target=scan_and_update, args=(directory,)).start()  # Start scanning in a new thread
+def select_directory(type=None):
+    directory = filedialog.askdirectory()
+    if directory:
+        if type == 'source':
+            source_entry.set(directory)
+            threading.Thread(target=scan_and_update, args=(directory,)).start()
+        elif type == 'target':
+            target_entry.set(directory)
+
+def scan_and_update(directory):  # Scan the directory for audio files and update the checkbuttons
+    global audio_files_list  # Use a global variable for the list of audio files
+    audio_files_list = scan_directory(directory)  # Get the list of audio files
+    update_checkbuttons(audio_files_list)  # Update the checkbuttons
+
 def scan_directory(directory):  # Scan the directory for audio files
     audio_files = []  # Initialize list of audio files
     for root, _, files in os.walk(directory):  # Walk through the directory tree
@@ -20,43 +29,22 @@ def scan_directory(directory):  # Scan the directory for audio files
             if file.endswith(('.mp3', '.wav')):  # Check if the file is an audio file
                 audio_files.append(os.path.join(root, file))  # Add the file to the list
     return audio_files
-def scan_and_update(directory):  # Scan the directory for audio files and update the checkbuttons
-    global audio_files_list  # Use a global variable for the list of audio files
-    audio_files_list = scan_directory(directory)  # Get the list of audio files
-    update_checkbuttons()  # Update the checkbuttons
-def select_target_directory():  # Select the target directory for transferring files
-    directory = filedialog.askdirectory()  # Get the selected directory
-    if directory:  # Check if a directory was selected
-        target_entry.set(directory)  # Set the entry field with the selected directory
-def on_filter_text_changed(event):  # Handle filter text changes
-    update_checkbuttons()  # Update the checkbuttons
-def on_entry_click(event):
-    if filter_entry.get() == 'Type here to filter files':
-        filter_entry.delete(0, tk.END)
-        filter_entry.config(fg='white')  # Change text color to black when user starts typing
-def on_entry_leave(event):
-    if not filter_entry.get():
-        filter_entry.insert(0, 'Type here to filter files')
-        filter_entry.config(fg='white')  # Change text color back to grey when entry is empty
-def on_mousewheel(event):  # Handle mouse wheel events
-    if event.delta < 0:
-        canvas.yview_scroll(1, "units")  # Scroll up
-    elif event.delta > 0:
-        canvas.yview_scroll(-1, "units")  # Scroll down
 
-def update_checkbuttons():  # Update the checkbuttons with the filtered list of audio files
+def on_filter_text_changed(event):   # Handle filter text changes
+    global filtered_files   # Use a global variable for the list of filtered files
+    
+    filter_text = filter_entry.get().lower() if filter_entry.get().lower() != 'type here to filter files' else ''
+    filtered_files = [file for file in audio_files_list if filter_text in os.path.basename(file).lower()]  # Filter the list of audio files
+    update_checkbuttons(filtered_files)   # Update the checkbuttons with the filtered list of audio files
+
+def update_checkbuttons(files):  # Update the checkbuttons with the filtered list of audio files
     for widget in checkbutton_frame.winfo_children():  # Destroy all existing widgets
         widget.destroy()  # Clear the frame
 
     global file_vars  # Use a global variable for the dictionary of variables
     file_vars = {}  # Initialize the dictionary
 
-    global filtered_files  # Use a global variable for the list of filtered files
-    
-    filter_text = filter_entry.get().lower() if filter_entry.get().lower() != 'type here to filter files' else ''
-    filtered_files = [file for file in audio_files_list if filter_text in os.path.basename(file).lower()]  # Filter the list of audio files
-
-    for file in filtered_files:  # Create a checkbutton for each filtered file
+    for file in files:  # Create a checkbutton for each filtered file
         var = tk.IntVar()  # Initialize an integer variable
         checkbutton = ttk.Checkbutton(checkbutton_frame, text=os.path.basename(file), variable=var)  # Create the checkbutton
         checkbutton.pack(fill=tk.X, anchor=tk.W, padx=12, pady=1)  # Pack the checkbutton
@@ -66,10 +54,26 @@ def update_checkbuttons():  # Update the checkbuttons with the filtered list of 
     canvas.update_idletasks()  # Update the canvas
     canvas.configure(scrollregion=canvas.bbox('all'))  # Configure the scroll region
 
-    if len(filtered_files) > 0:  # Check if there are any filtered files
+    if len(files) > 0:  # Check if there are any filtered files
         files_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=10, pady=(4, 8))  # Pack the frame
     else:
         files_frame.pack_forget()  # Forget the frame
+        
+def on_entry_click(event):
+    if filter_entry.get() == 'Type here to filter files':
+        filter_entry.delete(0, tk.END)
+        filter_entry.config(fg='white')  # Change text color to black when user starts typing
+
+def on_entry_leave(event):
+    if not filter_entry.get():
+        filter_entry.insert(0, 'Type here to filter files')
+        filter_entry.config(fg='white')  # Change text color back to grey when entry is empty
+
+def on_mousewheel(event):  # Handle mouse wheel events
+    if event.delta < 0:
+        canvas.yview_scroll(1, "units")  # Scroll up
+    elif event.delta > 0:
+        canvas.yview_scroll(-1, "units")  # Scroll down
 
 def show_visuals(file, checkbutton):
     
@@ -113,22 +117,14 @@ def play_audio():
                 sound.stop()
                 
             sound = pygame.mixer.Sound(last_selected_file)
-            sound.play()  # Start playback asynchronously
+            sound.play() # Start playback asynchronously
             
-            # Update audio_playing flag and button text asynchronously
-            audio_playing = True
+            audio_playing = True # Update audio_playing flag
             play_button.config(text="Stop")  # Change button text to "Stop"
-            
-    
-            # Update the last played file
-            last_played_file = last_selected_file
-            
-            # Schedule checking for playback completion
-            root.after(100, check_playback_completion)
+            last_played_file = last_selected_file # Update the last played file
+            root.after(100, check_playback_completion) # Schedule checking for playback completion
     else:
         messagebox.showerror("Error", "No audio file selected.")
-
-
 
 def check_playback_completion():
     global sound, audio_playing
@@ -138,6 +134,7 @@ def check_playback_completion():
         play_button.config(text="Play")  # Change button text to "Play"
     else:
         root.after(100, check_playback_completion) # Schedule the next check after 100 milliseconds
+
 def transfer_files():  # Transfer selected files to the target directory
     selected_files = [file for file, var in file_vars.items() if var.get()]  # Get the list of selected files
 
@@ -166,7 +163,7 @@ root.title("Audio Browser")  # Set the title of the window
 directory_frame = tk.Frame(root)
 
 source_frame = tk.Frame(directory_frame)  # Create a frame for the source directory
-select_source_button = tk.Button(source_frame, text="Select Source Directory", command=select_source_directory)  # Create a button to select the source directory
+select_source_button = tk.Button(source_frame, text="Select Source Directory", command=lambda: select_directory('source'))
 select_source_button.pack(side=tk.LEFT, padx=(0, 6))
 source_label = tk.Label(source_frame, text="Source Directory:")  # Create a label for the source directory
 source_label.pack(side=tk.LEFT)
@@ -177,7 +174,7 @@ source_entry_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 source_frame.pack(fill=tk.X, padx=10, pady=(6, 2))
 
 target_frame = tk.Frame(directory_frame)  # Create a frame for the target directory
-select_target_button = tk.Button(target_frame, text="Select Target Directory", command=select_target_directory)  # Create a button to select the target directory
+select_target_button = tk.Button(target_frame, text="Select Target Directory", command=lambda: select_directory('target'))
 select_target_button.pack(side=tk.LEFT, padx=(0, 6))
 target_label = tk.Label(target_frame, text="Target Directory:")  # Create a label for the target directory
 target_label.pack(side=tk.LEFT) 
@@ -235,5 +232,5 @@ transfer_button_frame.pack(side=tk.BOTTOM, pady=8)  # Pack the frame
 transfer_button = tk.Button(transfer_button_frame, text="Transfer Files", command=transfer_files)  # Create a button to transfer files
 transfer_button.pack(pady=6)  # Pack the button
 
-update_checkbuttons()  # Update the checkbuttons initially
+update_checkbuttons(audio_files_list)  # Update the checkbuttons initially
 root.mainloop()  # Start the main event loop
