@@ -8,7 +8,7 @@ import librosa.display
 
 class AudioViewer:
     @staticmethod
-    def generate_visuals_async(audio_file, waveform_frame, spectrogram_frame, checkbutton):
+    def generate_visuals_async(audio_file, waveform_frame, spectrogram_frame):
         # Load audio file
         y, sr = librosa.load(audio_file, sr=None)
 
@@ -42,9 +42,6 @@ class AudioViewer:
         spectrogram_canvas = FigureCanvasTkAgg(spectrogram_figure, master=spectrogram_frame)
         spectrogram_canvas.draw()
         spectrogram_canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-
-        # Call the callback function
-        checkbutton.state(['!alternate'])
 
         # Destroy Matplotlib figures
         plt.close(waveform_figure)

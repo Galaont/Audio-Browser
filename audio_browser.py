@@ -41,10 +41,18 @@ def scan_directory(directory):  # Scan the directory for audio files
                 audio_files.append(os.path.join(root, file))  # Add the file to the list
     return audio_files
 
+def toggle_searchbar_focus(event):
+    global filter_entry
+    if filter_entry.get() == ' Type here to filter files':
+        filter_entry.delete(0, tk.END)
+    else:
+        if not filter_entry.get():
+            filter_entry.insert(0, ' Type here to filter files')
+
 def on_filter_text_changed(event):   # Handle filter text changes
     global filtered_files   # Use a global variable for the list of filtered files
     
-    filter_text = filter_entry.get().lower() if filter_entry.get().lower() != 'type here to filter files' else ''
+    filter_text = filter_entry.get().lower() if filter_entry.get().lower() != ' type here to filter files' else ''
     filtered_files = [file for file in audio_files_list if filter_text in os.path.basename(file).lower()]  # Filter the list of audio files
     update_checkbuttons(filtered_files)   # Update the checkbuttons with the filtered list of audio files
 
@@ -52,31 +60,28 @@ def update_checkbuttons(files):  # Update the checkbuttons with the filtered lis
     for widget in checkbutton_frame.winfo_children():  # Destroy all existing widgets
         widget.destroy()  # Clear the frame
 
-    global file_vars  # Use a global variable for the dictionary of variables
-    file_vars = {}  # Initialize the dictionary
-
     for file in files:  # Create a checkbutton for each filtered file
         var = tk.IntVar()  # Initialize an integer variable
         checkbutton = ttk.Checkbutton(checkbutton_frame, text=os.path.basename(file), variable=var)  # Create the checkbutton
-        checkbutton.pack(fill=tk.X, anchor=tk.W, padx=12, pady=1)  # Pack the checkbutton
+        checkbutton.bind("<Button-1>", lambda event, file=file, var=var, cb=checkbutton: on_file_selection(file, var))   # Bind a function to the checkbutton
+        checkbutton.pack(fill=tk.X, anchor=tk.W, padx=12, pady=0)  # Pack the checkbutton
         file_vars[file] = var  # Add the variable to the dictionary
-        checkbutton.bind("<Button-1>", lambda event, file=file, cb=checkbutton: show_visuals(file, cb))   # Bind a function to the checkbutton
 
     canvas.update_idletasks()  # Update the canvas
     canvas.configure(scrollregion=canvas.bbox('all'))  # Configure the scroll region
 
-    if len(files) > 0:  # Check if there are any filtered files
-        files_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=10, pady=(4, 8))  # Pack the frame
-    else:
-        files_frame.pack_forget()  # Forget the frame
-        
-def toggle_searchbar_focus(event):
-    global filter_entry
-    if filter_entry.get() == 'Type here to filter files':
-        filter_entry.delete(0, tk.END)
-    else:
-        if not filter_entry.get():
-            filter_entry.insert(0, 'Type here to filter files')
+    files_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True, padx=10, pady=(4, 8)) if len(files) > 0 else files_frame.pack_forget()
+
+def on_file_selection(file, var):
+    if var.get() == 0 and file not in selected_files:
+        selected_files.append(file)
+        var.set(1)
+        print(f"File selected: {file, var.get()}")
+    elif var.get() == 1 and file in selected_files:
+        selected_files.remove(file)
+        var.set(0)
+        print(f"File selected: {file, var.get()}")
+    show_visuals(file)
 
 def on_mousewheel(event):  # Handle mouse wheel events
     if event.delta < 0:
@@ -84,7 +89,7 @@ def on_mousewheel(event):  # Handle mouse wheel events
     elif event.delta > 0:
         canvas.yview_scroll(-1, "units")  # Scroll down
 
-def show_visuals(file, checkbutton):
+def show_visuals(file):
     
     global last_selected_file
     if file == last_selected_file: last_selected_file; play_audio(); return
@@ -99,7 +104,7 @@ def show_visuals(file, checkbutton):
 
         def display_waveform_and_spectrogram():
             loading_label.destroy()
-            AudioViewer.generate_visuals_async(file, waveform_frame, spectrogram_frame, checkbutton)
+            AudioViewer.generate_visuals_async(file, waveform_frame, spectrogram_frame)
 
             # Prevent the window from shrinking below the original size
             root.update_idletasks()
@@ -110,7 +115,7 @@ def show_visuals(file, checkbutton):
             play_button.pack(side=tk.BOTTOM)# Pack the play button at the bottom of the player frame
             play_audio()  # Start audio playback after visuals are generated
         
-        visuals_frame.after(0, display_waveform_and_spectrogram) # Call the function asynchronously
+        visuals_frame.after(50, display_waveform_and_spectrogram) # Call the function asynchronously
         play_button.pack_forget() # Hide the play button during plot generation
 
 def play_audio():
@@ -131,7 +136,7 @@ def play_audio():
             audio_playing = True # Update audio_playing flag
             play_button.config(text="Stop")  # Change button text to "Stop"
             last_played_file = last_selected_file # Update the last played file
-            root.after(20, check_playback_completion) # Schedule checking for playback completion
+            root.after(200, check_playback_completion) # Schedule checking for playback completion
     else:
         messagebox.showerror("Error", "No audio file selected.")
 
@@ -142,7 +147,7 @@ def check_playback_completion():
         audio_playing = False
         play_button.config(text="Play")  # Change button text to "Play"
     else:
-        root.after(20, check_playback_completion) # Schedule the next check after 100 milliseconds
+        root.after(100, check_playback_completion) # Schedule the next check after 100 milliseconds
 
 def transfer_files():  # Transfer selected files to the target directory
     selected_files = [file for file, var in file_vars.items() if var.get()]  # Get the list of selected files
@@ -161,8 +166,9 @@ def transfer_files():  # Transfer selected files to the target directory
 
     messagebox.showinfo("Success", "Files transferred successfully.")  # Show a success message
 
-audio_files_list, filtered_files, checkvars = [], [], []  # Initialize a list for audio files, filtered files and check variables
+audio_files_list, filtered_files, selected_files = [], [], []  # Initialize a list for audio files, filtered files and check variables
 directory_cache = {'source': '', 'target': ''}
+file_vars = {}  # Initialize the dictionary
 last_played_file, last_selected_file, sound = None, None, None
 audio_playing = False
 
